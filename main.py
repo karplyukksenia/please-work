@@ -122,6 +122,11 @@ def create_note_api():
             'INSERT INTO notes (user_id, title, content, tags) VALUES (?, ?, ?, ?)',
             (data['user_id'], data['title'], data['content'], ' '.join(i for i in data['tags']))
         )
+        cursor.execute('SELECT id FROM notes WHERE title = ?', (data['title'],))
+        note_id = cursor.fetchone()[0]
+        for tag in data['tags']:
+            cursor.execute('INSERT INTO tags (user_id, note_id, name) VALUES (?, ?, ?)',
+                           (data['user_id'], note_id, tag,))
 
         conn.commit()
         return jsonify({"message": "Note created successfully"}), 201
@@ -132,4 +137,4 @@ def create_note_api():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run()
