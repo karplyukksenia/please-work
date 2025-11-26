@@ -253,22 +253,18 @@ def get_graph_data():
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute('''
-            SELECT id, title, tags
-            FROM notes
-            ORDER BY id
-        ''')
+        cursor.execute('SELECT id, title, tags FROM notes ORDER BY id')
         rows = cursor.fetchall()
 
         nodes = []
-        note_tags = {}  # id -> set(tags)
+        note_tags = {}
 
         for row in rows:
             note_id = row['id']
             title = row['title']
             tags_str = row['tags'] or ""
-            tags_list = tags_str.split() if tags_str else []
-            tag_set = set(tag.lower() for tag in tags_list if tag.strip())
+            tags_list = [t.strip().lower() for t in tags_str.split() if t.strip()]
+            tag_set = set(tags_list)
 
             nodes.append({
                 "id": note_id,
@@ -277,14 +273,21 @@ def get_graph_data():
             })
             note_tags[note_id] = tag_set
 
-        # Строим связи: если у двух заметок есть хотя бы 1 общий тег
+        # Строим связи: каждая связь знает, через какие теги она образована
         links = []
         note_ids = list(note_tags.keys())
         for i in range(len(note_ids)):
             for j in range(i + 1, len(note_ids)):
                 id1, id2 = note_ids[i], note_ids[j]
-                if note_tags[id1] & note_tags[id2]:  # пересечение множеств
-                    links.append({"source": id1, "target": id2})
+                common = note_tags[id1] & note_tags[id2]
+                if common:
+                    # Берём ОДИН тег для простоты (например, первый по алфавиту)
+                    representative_tag = sorted(common)[0]
+                    links.append({
+                        "source": id1,
+                        "target": id2,
+                        "via_tag": representative_tag  # ← ключевое поле
+                    })
 
         return jsonify({"nodes": nodes, "links": links})
 
@@ -295,4 +298,4 @@ def get_graph_data():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run()
