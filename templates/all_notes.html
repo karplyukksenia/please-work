@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Все заметки - PKM</title>
-<style>
+    <style>
         * {
             box-sizing: border-box;
             margin: 0;
@@ -195,6 +195,29 @@
             overflow: hidden;
         }
 
+        .note-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 16px;
+        }
+
+        .note-tag {
+            background: linear-gradient(90deg, #00bcd4, #3f51b5);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: 500;
+            box-shadow: 0 2px 8px rgba(0, 188, 212, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .note-tag:hover {
+            transform: scale(1.05);
+            box-shadow: 0 3px 12px rgba(0, 188, 212, 0.4);
+        }
+
         .note-meta {
             display: flex;
             justify-content: space-between;
@@ -225,6 +248,14 @@
             background: rgba(255, 112, 112, 0.1);
             border-radius: 12px;
             margin: 20px 0;
+        }
+
+        .search-hint {
+            text-align: center;
+            color: #a0a0c0;
+            font-size: 0.9em;
+            margin-top: 8px;
+            margin-bottom: 15px;
         }
 
         @media (max-width: 768px) {
@@ -258,8 +289,11 @@
         </div>
 
         <div class="search-bar">
-            <input type="text" id="searchInput" class="search-input" placeholder="Поиск по заметкам...">
+            <input type="text" id="searchInput" class="search-input" placeholder="Поиск по названию, содержанию или тегам...">
             <button id="searchButton" class="search-button">Поиск</button>
+        </div>
+        <div class="search-hint">
+            Поиск работает по названию, содержанию и тегам заметок
         </div>
 
         <div class="stats">
@@ -270,6 +304,10 @@
             <div class="stat-card">
                 <div class="stat-number" id="recentNotes">0</div>
                 <div class="stat-label">За последние 7 дней</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalTags">0</div>
+                <div class="stat-label">Уникальных тегов</div>
             </div>
         </div>
 
@@ -288,26 +326,32 @@
             // Обработчик поиска
             document.getElementById('searchButton').addEventListener('click', filterNotes);
             document.getElementById('searchInput').addEventListener('input', filterNotes);
+
+            // Обработчик нажатия Enter в поле поиска
+            document.getElementById('searchInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    filterNotes();
+                }
+            });
         });
 
         // Загрузка всех заметок
+        async function loadAllNotes() {
+            try {
+                const response = await fetch('/api/notes/all');
+                if (!response.ok) {
+                    throw new Error('Ошибка загрузки заметок');
+                }
 
-    async function loadAllNotes() {
-        try {
-            const response = await fetch('/api/notes/all'); // Было '/api/notes/all'
-            if (!response.ok) {
-                throw new Error('Ошибка загрузки заметок');
+                allNotes = await response.json();
+                displayAllNotes(allNotes);
+                updateStats(allNotes);
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('notesContainer').innerHTML =
+                    '<div class="error">Ошибка загрузки заметок: ' + error.message + '</div>';
             }
-
-            allNotes = await response.json();
-            displayAllNotes(allNotes);
-            updateStats(allNotes);
-        } catch (error) {
-            console.error('Error:', error);
-            document.getElementById('notesContainer').innerHTML =
-                '<div class="error">Ошибка загрузки заметок: ' + error.message + '</div>';
         }
-    }
 
         // Отображение всех заметок
         function displayAllNotes(notes) {
@@ -330,9 +374,21 @@
                 const contentPreview = note.content.length > 150 ?
                     note.content.substring(0, 150) + '...' : note.content;
 
+                // Обрабатываем теги
+                let tagsHtml = '';
+                if (note.tags && note.tags.trim()) {
+                    const tags = note.tags.split(' ').filter(tag => tag.trim());
+                    tagsHtml = `
+                        <div class="note-tags">
+                            ${tags.map(tag => `<span class="note-tag">${escapeHtml(tag)}</span>`).join('')}
+                        </div>
+                    `;
+                }
+
                 html += `
                 <div class="note-card" onclick="openNote(${note.id})">
                     <div class="note-title">${escapeHtml(note.title)}</div>
+                    ${tagsHtml}
                     <div class="note-content">${escapeHtml(contentPreview)}</div>
                     <div class="note-meta">
                         <span class="note-date">${created}</span>
@@ -354,6 +410,17 @@
             weekAgo.setDate(weekAgo.getDate() - 7);
             const recentCount = notes.filter(note => new Date(note.created_at) > weekAgo).length;
             document.getElementById('recentNotes').textContent = recentCount;
+
+            // Подсчет уникальных тегов
+            const allTags = new Set();
+            notes.forEach(note => {
+                if (note.tags && note.tags.trim()) {
+                    note.tags.split(' ').filter(tag => tag.trim()).forEach(tag => {
+                        allTags.add(tag.toLowerCase());
+                    });
+                }
+            });
+            document.getElementById('totalTags').textContent = allTags.size;
         }
 
         // Фильтрация заметок
@@ -365,15 +432,85 @@
                 return;
             }
 
-            const filteredNotes = allNotes.filter(note =>
-                note.title.toLowerCase().includes(searchTerm) ||
-                note.content.toLowerCase().includes(searchTerm) ||
-                note.username.toLowerCase().includes(searchTerm)
-            );
+            const filteredNotes = allNotes.filter(note => {
+                // Поиск по заголовку
+                const titleMatch = note.title.toLowerCase().includes(searchTerm);
+                // Поиск по содержанию
+                const contentMatch = note.content.toLowerCase().includes(searchTerm);
+                // Поиск по тегам
+                const tagsMatch = note.tags && note.tags.toLowerCase().includes(searchTerm);
+                // Поиск по username
+                const userMatch = note.username.toLowerCase().includes(searchTerm);
+
+                return titleMatch || contentMatch || tagsMatch || userMatch;
+            });
 
             displayAllNotes(filteredNotes);
+
+            // Обновляем статистику для отфильтрованных результатов
+            updateStatsForFiltered(filteredNotes, searchTerm);
         }
 
+        // Обновление статистики для отфильтрованных результатов
+        function updateStatsForFiltered(notes, searchTerm) {
+            document.getElementById('totalNotes').textContent = notes.length;
+
+            // Подсчет заметок за последние 7 дней в отфильтрованных результатах
+            const weekAgo = new Date();
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            const recentCount = notes.filter(note => new Date(note.created_at) > weekAgo).length;
+            document.getElementById('recentNotes').textContent = recentCount;
+
+            // Подсчет уникальных тегов в отфильтрованных результатах
+            const allTags = new Set();
+            notes.forEach(note => {
+                if (note.tags && note.tags.trim()) {
+                    note.tags.split(' ').filter(tag => tag.trim()).forEach(tag => {
+                        allTags.add(tag.toLowerCase());
+                    });
+                }
+            });
+            document.getElementById('totalTags').textContent = allTags.size;
+
+            // Добавляем подсветку найденного запроса
+            if (searchTerm && notes.length > 0) {
+                highlightSearchResults(searchTerm);
+            }
+        }
+
+        // Подсветка результатов поиска
+        function highlightSearchResults(searchTerm) {
+            const noteCards = document.querySelectorAll('.note-card');
+            noteCards.forEach(card => {
+                const title = card.querySelector('.note-title');
+                const content = card.querySelector('.note-content');
+                const tags = card.querySelectorAll('.note-tag');
+
+                // Сбрасываем предыдущую подсветку
+                title.innerHTML = escapeHtml(title.textContent);
+                content.innerHTML = escapeHtml(content.textContent);
+
+                // Подсвечиваем в заголовке
+                if (title.textContent.toLowerCase().includes(searchTerm)) {
+                    const regex = new RegExp(`(${escapeRegex(searchTerm)})`, 'gi');
+                    title.innerHTML = title.textContent.replace(regex, '<mark style="background: rgba(0, 188, 212, 0.3); color: #00bcd4; padding: 2px 4px; border-radius: 4px;">$1</mark>');
+                }
+
+                // Подсвечиваем в содержании
+                if (content.textContent.toLowerCase().includes(searchTerm)) {
+                    const regex = new RegExp(`(${escapeRegex(searchTerm)})`, 'gi');
+                    content.innerHTML = content.textContent.replace(regex, '<mark style="background: rgba(0, 188, 212, 0.3); color: #00bcd4; padding: 2px 4px; border-radius: 4px;">$1</mark>');
+                }
+
+                // Подсвечиваем теги, которые совпадают с поиском
+                tags.forEach(tag => {
+                    if (tag.textContent.toLowerCase().includes(searchTerm)) {
+                        tag.style.background = 'linear-gradient(90deg, #ff9800, #f57c00)';
+                        tag.style.transform = 'scale(1.1)';
+                    }
+                });
+            });
+        }
 
         function openNote(noteId) {
             window.open(`/note/${noteId}`, '_blank');
@@ -381,6 +518,7 @@
 
         // Функция экранирования HTML
         function escapeHtml(unsafe) {
+            if (!unsafe) return '';
             return unsafe
                 .replace(/&/g, "&amp;")
                 .replace(/</g, "&lt;")
@@ -388,6 +526,11 @@
                 .replace(/"/g, "&quot;")
                 .replace(/'/g, "&#039;")
                 .replace(/\n/g, '<br>');
+        }
+
+        // Функция для экранирования спецсимволов в регулярных выражениях
+        function escapeRegex(string) {
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         }
     </script>
 </body>
