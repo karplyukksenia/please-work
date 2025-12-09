@@ -21,37 +21,16 @@
 
 ## Технологии
 
-- Backend:ок и органи 
-- База данных:Личная база (`pkm_database.db`)  
-- Хэширование паролей:Flask
+- Backend:**Flask**
+- База данных: **SQLite** 
+- Хэширование паролей:**bcrypt**
+- Фронтенд: HTML + немного CSS (всё в `/templates` и `/static`)
 
-![Pyt 
-- Фронтенд: HTML + немного CSS (всё в) на Flask
 
-![и `/static`)
-
-## Быстрый старт
+## Структура
 
 ```bash
-# 1. Клонируем
-git clone https://github.com/karplyukksenia/please-work.git
-cd please-work
 
-# 2. Создаём виртуальное окружение (рекомендуется)
-python -m venv venv
-source venv/bin/activate    # Windows: venv\Scripts\activate
-
-# 3. Устанавливаем зависимости
-pip install flask bcrypt
-
-# 4. Запускаем
-python main.py
-Открой в браузере → http://127.0.0.1:5000
-Демка без регистрации
-Логин: demo_user
-Пароль: demo
-(демо-аккаунт создаётся автоматически при первом запуске)
-Структура проекта
 please-work/
 ├── main.py              # точка входа
 ├── pkm_database.db      # создаётся автоматически
@@ -61,7 +40,8 @@ please-work/
 │   ├── register.html
 │   ├── all_notes.html
 │   └── ...
-├── static/              # CSS, картинки (пока минимально)
-└── requirements.txt     # (можно сгенерировать: pip freeze > requirements.txt)
+├── static/              # CSS
+└── requirements.txt     
 ```
+
 
