@@ -36,7 +36,7 @@ python -m venv venv
 source venv/bin/activate        # Linux / macOS
 # venv\Scripts\activate         # Windows
 
-# 3. Создаем файл .env в общей папке
+# 3. Создаем файл .env в общей папке. Внутри файла необходимо написать:
 FLASK_SECRET_KEY=your_secret_key_here
 # Для генерации рекомендуется следующий код:
 # import secrets
@@ -54,6 +54,7 @@ python main.py
 ## Веб-версия
 
 Доступна веб-версия приложения: https://zametnote.onrender.com/
+
 
 
 
